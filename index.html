@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金华镇狗场赶集日历 - 智慧生活</title>
+    <style>
+        :root {
+            --primary-color: #00f2fe;
+            --accent-color: #4facfe;
+            --bg-dark: #0f172a;
+            --glass-bg: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'PingFang SC', sans-serif; }
+
+        body {
+            background: radial-gradient(circle at top right, #1e293b, #0f172a);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* 炫酷背景光晕 */
+        .glow {
+            position: fixed;
+            width: 300px;
+            height: 300px;
+            background: var(--primary-color);
+            filter: blur(120px);
+            opacity: 0.2;
+            z-index: -1;
+            top: 10%;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 { font-weight: 300; margin-bottom: 30px; letter-spacing: 2px; }
+
+        /* 核心状态圆盘 */
+        .status-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 30px;
+            padding: 40px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .circle-display {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 4px solid var(--primary-color);
+            box-shadow: 0 0 20px var(--primary-color);
+            transition: all 0.5s ease;
+        }
+
+        .is-market { background: rgba(0, 242, 254, 0.1); }
+        .not-market { border-color: #94a3b8; box-shadow: none; opacity: 0.8; }
+
+        .status-text { font-size: 1.2rem; color: #94a3b8; }
+        .status-value { font-size: 2.5rem; font-weight: bold; margin-top: 5px; }
+
+        /* 列表展示 */
+        .info-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .info-item {
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .info-label { font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px; }
+        .info-date { font-size: 1rem; font-weight: 600; }
+        .info-week { font-size: 0.9rem; color: var(--primary-color); margin-top: 4px; }
+
+        /* 日期选择器自定义 */
+        .date-picker-wrap {
+            margin-top: 30px;
+            padding: 15px;
+        }
+
+        input[type="date"] {
+            background: var(--glass-bg);
+            border: 1px solid var(--primary-color);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 50px;
+            outline: none;
+            width: 100%;
+            font-size: 1rem;
+        }
+
+        footer { margin-top: auto; padding: 20px; font-size: 0.7rem; color: #475569; }
+    </style>
+</head>
+<body>
+    <div class="glow"></div>
+
+    <div class="container">
+        <h1>赶集助手</h1>
+
+        <div class="status-card">
+            <div id="statusCircle" class="circle-display">
+                <div class="status-text">今日状态</div>
+                <div id="todayStatus" class="status-value">加载中</div>
+            </div>
+            <p id="currentFullDate" style="color: #64748b; font-size: 0.9rem;"></p>
+        </div>
+
+        <div class="info-list">
+            <div class="info-item">
+                <div class="info-label">◀ 上一次赶集</div>
+                <div id="prevDate" class="info-date">-</div>
+                <div id="prevWeek" class="info-week">-</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">下一次赶集 ▶</div>
+                <div id="nextDate" class="info-date">-</div>
+                <div id="nextWeek" class="info-week">-</div>
+            </div>
+        </div>
+
+        <div class="date-picker-wrap">
+            <p style="margin-bottom: 10px; font-size: 0.8rem; color: #94a3b8;">查询其他日期</p>
+            <input type="date" id="dateInput" onchange="updateUI(new Date(this.value))">
+        </div>
+    </div>
+
+    <footer>
+        规则：每周一次，次周为前一天循环
+    </footer>
+
+    <script>
+        // 设定一个已知的赶集日基准（2026年1月12日是周一，赶集）
+        const BASE_DATE = new Date('2026-01-12');
+        const WEEK_DAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+        function formatDate(date) {
+            return `${date.getMonth() + 1}月${date.getDate()}日`;
+        }
+
+        function checkMarket(targetDate) {
+            const target = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+            const base = new Date(BASE_DATE.getFullYear(), BASE_DATE.getMonth(), BASE_DATE.getDate());
+            const diffDays = Math.floor((target - base) / (1000 * 60 * 60 * 24));
+            
+            // 计算余数，JavaScript处理负数取模需要特殊处理
+            const remainder = ((diffDays % 6) + 6) % 6;
+            return remainder === 0;
+        }
+
+        function updateUI(date) {
+            const isMarket = checkMarket(date);
+            const statusCircle = document.getElementById('statusCircle');
+            const todayStatus = document.getElementById('todayStatus');
+            const currentFullDate = document.getElementById('currentFullDate');
+
+            // 1. 更新今日状态
+            todayStatus.innerText = isMarket ? "赶集日" : "不赶集";
+            currentFullDate.innerText = `${date.getFullYear()}年${formatDate(date)} ${WEEK_DAYS[date.getDay()]}`;
+            
+            if (isMarket) {
+                statusCircle.className = "circle-display is-market";
+            } else {
+                statusCircle.className = "circle-display not-market";
+            }
+
+            // 2. 计算上一次和下一次
+            // 因为间隔是6天，所以寻找最近的赶集日
+            const targetTime = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+            const dayMillis = 24 * 60 * 60 * 1000;
+            
+            // 计算相对于基准的偏移
+            const baseTime = new Date(BASE_DATE.getFullYear(), BASE_DATE.getMonth(), BASE_DATE.getDate()).getTime();
+            const diffDays = Math.floor((targetTime - baseTime) / dayMillis);
+            const daysSinceLast = ((diffDays % 6) + 6) % 6;
+
+            // 上一次：如果是今天赶集，则上一次是 6 天前；如果不是，则减去偏移量
+            const prevMarketDate = new Date(targetTime - (daysSinceLast === 0 ? 6 : daysSinceLast) * dayMillis);
+            // 下一次：如果是今天赶集，则下一次是 6 天后；如果不是，则补齐 6 天
+            const nextMarketDate = new Date(targetTime + (6 - daysSinceLast) * dayMillis);
+
+            document.getElementById('prevDate').innerText = formatDate(prevMarketDate);
+            document.getElementById('prevWeek').innerText = WEEK_DAYS[prevMarketDate.getDay()];
+            
+            document.getElementById('nextDate').innerText = formatDate(nextMarketDate);
+            document.getElementById('nextWeek').innerText = WEEK_DAYS[nextMarketDate.getDay()];
+        }
+
+        // 初始化
+        const now = new Date();
+        document.getElementById('dateInput').valueAsDate = now;
+        updateUI(now);
+    </script>
+</body>
+</html>
